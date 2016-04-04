@@ -1,3 +1,4 @@
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
 #include <string>
@@ -7,8 +8,68 @@
 #include <algorithm>
 #include "ImageDataSet.h"
 
+
 using namespace cv;
 using namespace std;
+
+
+
+
+//7 fold cross validation 
+
+class KFold {
+
+	const int k = 7;
+	vector<vector<Mat>> partitionedData;
+	vector<int> indicesToConsider;
+
+
+	/*this is the only function you should call it returns a vector containing 7 Mat vectors of partitioned data*/
+public:vector<vector<Mat>> getPartitionedData(ImageDataSet data){
+		   initializeIndices();
+		   initializePartitionedData();
+		   createFolds(data);
+		   cout << "I return partitioned data \n";
+		   return partitionedData;
+}
+
+	   void initializePartitionedData(){
+		   partitionedData.resize(k);
+	   }
+	   void initializeIndices() {
+		   for (int i = 0; i < k; i++) {
+			   indicesToConsider.push_back(i);
+		   }
+	   }
+	   //Partitions the data in 7 disjoint subsets
+	   void createFolds(ImageDataSet data){
+
+		   int randomIndex = 0;
+		   for (int i = 0; i < data.QMUL_SubjectIDs.size(); i++) {
+
+			   for (int j = 0; j < data.QMUL_PanCodes.size(); j++) {
+
+				   for (int k = 0; k < data.QMUL_TiltCodes.size(); k++){
+					   //get a random index in which to place the image
+					   randomIndex = rand() % indicesToConsider.size();
+					   randomIndex = indicesToConsider.at(randomIndex);
+					   //get sequence of PanCodes and Tilt Codes to skip
+					   Mat grey = Mat(100, 100, CV_32FC1);
+					   cvtColor(data.QMUL_getSubjectImageByPose(data.QMUL_SubjectIDs[i], data.QMUL_TiltCodes[k], data.QMUL_PanCodes[j]), grey, CV_BGR2GRAY);
+					   partitionedData.at(randomIndex).push_back(grey);
+
+					   //check if we have saturation at given random index and if so remove it from
+					   //indices to consider, given pseudorandom number generation which is not uniform
+					   if (partitionedData.at(randomIndex).size() >= 589) {
+						   indicesToConsider.erase(remove(indicesToConsider.begin(), indicesToConsider.end(), randomIndex), indicesToConsider.end());
+					   }
+				   }
+			   }
+
+		   }
+	   }
+};
+
 
 void crossValidation(ImageDataSet data);
 
@@ -19,9 +80,10 @@ void main(void)
 
 	//Put the full path of the QMUL Multiview Face Dataset folder here
 	//C:\Users\Dimitri-G\CVProject\CVProject\resources\HeadPoseImageDatabase
-	const string QMULPath = "C:/Users/Salian/Dropbox/Winter2016/Vision/CVProject/CVProject/resources/QMUL_360degreeViewSphere_FaceDatabase/Set1_Greyscale";
+	const string QMULPath = "C:/Users/Dimitri-G/CVProject/CVProject/resources/QMUL_360degreeViewSphere_FaceDatabase/Set1_Greyscale";
+	int k = 0;
 	//Put the full path of the Head Pose Image Database folder here
-	const string HeadPoseDBPath = "C:/Users/Salian/Dropbox/Winter2016/Vision/CVProject/CVProject/resources/HeadPoseImageDatabase";
+	const string HeadPoseDBPath = "C:/Users/Dimitri-G/CVProject/CVProject/resources/HeadPoseImageDatabase";
 
 	//Load the dataset by instantiating the helper class
 	ImageDataSet data(QMULPath, HeadPoseDBPath);
@@ -65,7 +127,7 @@ void main(void)
 
 	//implement the rest of the code here
 
-	//crossValidation(data);
+	crossValidation(data);
 }
 
 /*
@@ -128,7 +190,7 @@ void Eigenfaces(const vector<Mat>& imgSet) {
 		printf("Matrix does not have right format\n");
 		cout << "format is = " << newData.type() << '\n';
 		cout << "format is = " << CV_32FC1 << '\n';
-	}
+}
 	Mat cov;
 	_mean = Mat(1, data.cols, CV_32F, 0);
 	calcCovarMatrix(data, cov, _mean, CV_COVAR_NORMAL + CV_COVAR_ROWS);
@@ -136,7 +198,7 @@ void Eigenfaces(const vector<Mat>& imgSet) {
 	Mat eigenvectors;
 
 	bool ret;
-
+	cout << "I get covariance matrix \n";
 	ret = eigen(cov, _eigenvalues, _eigenvectors);
 
 }
@@ -145,14 +207,32 @@ void crossValidation(ImageDataSet data) {
 
 	//Do 7 fold cross validation
 	//Create 7 sets of equal size, 6 sets are the training sets and 1 set is the testing set
+	/*
 	vector<Mat> trainingSet;
 	for (int i = 0; i < data.QMUL_SubjectIDs.size(); i++) {
-
-		Mat grey = Mat(100, 100, CV_32FC1);
-		cvtColor(data.QMUL_getSubjectImageByPose(data.QMUL_SubjectIDs[i], "090", "090"), grey, CV_BGR2GRAY);
-		trainingSet.push_back(grey);
-
+	for (int j = 0; j < data.QMUL_PanCodes.size(); j++) {
+	for (int k = 0; k < data.QMUL_TiltCodes.size(); k++){
+	//get sequence of PanCodes and Tilt Codes to skip
+	Mat grey = Mat(100, 100, CV_32FC1);
+	cvtColor(data.QMUL_getSubjectImageByPose(data.QMUL_SubjectIDs[i], "090", "090"), grey, CV_BGR2GRAY);
+	trainingSet.push_back(grey);
 	}
+	}
+
+	}*/
+
+	vector<Mat> trainingSet;
+	vector<Mat> testSet;
+	KFold kfold;
+	vector<vector<Mat>> partitioned = kfold.getPartitionedData(data);
+	testSet.insert(testSet.end(), partitioned[0].begin(), partitioned[0].end());
+	for (int i = 1; i < 7; i++){
+		trainingSet.insert(trainingSet.end(), partitioned[i].begin(), partitioned[i].end());
+	}
+
+	cout << "size of training set =" << trainingSet.size() << '\n';
+	cout << "size of test set =" << testSet.size() << '\n';
+
 
 	//call the function to produce eigenvectors
 	Eigenfaces(trainingSet);
@@ -169,7 +249,9 @@ void crossValidation(ImageDataSet data) {
 	Mat projection = (_data - _mean)*
 
 	}*/
-	//cout << _mean;
+	cout << _mean;
+	cout << _mean.rows;
+	cout << _mean.cols;
 	//cout << _mean2;
 
 	//display the average image
@@ -181,3 +263,5 @@ void crossValidation(ImageDataSet data) {
 	imshow("average image", _mean2.reshape(0, data.QMUL_getSubjectImageByPose(data.QMUL_SubjectIDs[0], "090", "090").rows));
 	waitKey(0);
 }
+
+
