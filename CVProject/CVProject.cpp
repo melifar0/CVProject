@@ -20,12 +20,11 @@ void main(void)
 	//Put the full path of the QMUL Multiview Face Dataset folder here
 	//C:\Users\Dimitri-G\CVProject\CVProject\resources\HeadPoseImageDatabase
 	const string QMULPath = "C:/Users/Salian/Dropbox/Winter2016/Vision/CVProject/CVProject/resources/QMUL_360degreeViewSphere_FaceDatabase/Set1_Greyscale";
-	int k = 0;
 	//Put the full path of the Head Pose Image Database folder here
 	const string HeadPoseDBPath = "C:/Users/Salian/Dropbox/Winter2016/Vision/CVProject/CVProject/resources/HeadPoseImageDatabase";
 
 	//Load the dataset by instantiating the helper class
-	ImageDataSet data = ImageDataSet::ImageDataSet(QMULPath, HeadPoseDBPath);
+	ImageDataSet data(QMULPath, HeadPoseDBPath);
 
 	//Terminate if data is not successfully loaded
 	if (!data.isSuccessfullyLoaded())
