@@ -125,18 +125,19 @@ void EigenFaces::crossValidation(ImageDataSet data) {
 
 
 	//try adding the mean to the projection
+	/*
 	for (int i = 0; i < projection.rows; i++) {
 		add(projection.row(i), _mean, projection.row(i));
-	}
+	}*/
 
 	//get the reconstuction matrix
 	Mat reconstruction;
 	gemm(projection, subsetOfEigenvectors, 1.0, Mat(), 0.0, reconstruction, GEMM_2_T);
 	//add the mean matrix to the reconstruction
-	/*
+	
 	for (int i = 0; i < reconstruction.rows; i++) {
 		add(reconstruction.row(i), _mean, reconstruction.row(i));
-	}*/
+	}
 	//add the mean matrix again to the data for comparison purposes
 	for (int i = 0; i < _data.rows; i++) {
 		add(_data.row(i), _mean, _data.row(i));
