@@ -11,8 +11,10 @@ using namespace std;
 
 class BOWFaces {
 public:
-	void BOWcrossValidation(ImageDataset data);
-	void BOWTrain(const vector<Mat>& imgSet, Mat &codeBook, vector<vector<Mat>> &imageDescriptors, const int numCodewords)
-	void BOWTest(const vector<Mat>& imgSet, const Mat &codeBook, const vector<vector<Mat>> &imageDescriptors)
+	void BOWcrossValidation(ImageDataSet data);
+	void BOWTrain(const vector<Mat>& imgSet, Mat &codeBook, vector<Mat> &BOWhistrow, const int numCodewords);
+	double chiSquareDist(InputArray _H1, InputArray _H2);
 };
+private:
+	double BOWTest(const vector<Mat>& imgSet, const Mat &codeBook, const vector<Mat> &BOWhistrow, const vector<string> &trainingSetLabels, const vector<string> &testSetLabels);
 #endif
