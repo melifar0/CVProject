@@ -17,4 +17,5 @@ public:
 	Mat project(int numEigenvectors, Mat input);
 	Mat reconstruct(int numEigenvectors, Mat projection);
 	Mat getDataAsRows(vector<Mat> src);
+	int makePrediction(Mat trainingProjections, Mat testingProjection);
 };

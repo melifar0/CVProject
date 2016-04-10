@@ -11,6 +11,8 @@ public:
 	void createFolds(ImageDataSet data);
 	void initializePartitionedData();
 	void initializeIndices();
+	void initializeLabels();
+	vector<vector<string>> getLabels();
 
 
 };

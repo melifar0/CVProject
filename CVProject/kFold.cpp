@@ -14,11 +14,13 @@ using namespace std;
 	const int k = 7;
 	vector<vector<Mat>> partitionedData;
 	vector<int> indicesToConsider;
+	vector<vector<string>> labels;
 
 	/*this is the only function you should call it returns a vector containing 7 Mat vectors of partitioned data*/
       vector<vector<Mat>> KFold::getPartitionedData(ImageDataSet data){
 		   initializeIndices();
 		   initializePartitionedData();
+		   initializeLabels();
 		   createFolds(data);
 		   cout << "I return partitioned data \n";
 		   return partitionedData;
@@ -27,6 +29,13 @@ using namespace std;
 	  void KFold::initializePartitionedData(){
 		   partitionedData.resize(k);
 	   }
+	  vector<vector<string>> KFold::getLabels(){
+		  return labels;
+	  }
+
+	  void KFold::initializeLabels(){
+		  labels.resize(k);
+	  }
 	   void KFold::initializeIndices() {
 		   for (int i = 0; i < k; i++) {
 			   indicesToConsider.push_back(i);
@@ -48,6 +57,9 @@ using namespace std;
 					   Mat grey = Mat(100, 100, CV_32FC1);
 					   cvtColor(data.QMUL_getSubjectImageByPose(data.QMUL_SubjectIDs[i], data.QMUL_TiltCodes[k], data.QMUL_PanCodes[j]), grey, CV_BGR2GRAY);
 					   partitionedData.at(randomIndex).push_back(grey);
+
+					   //add labels which is subject ID for recognition
+					   labels.at(randomIndex).push_back(data.QMUL_SubjectIDs[i]);
 
 					   //check if we have saturation at given random index and if so remove it from
 					   //indices to consider, given pseudorandom number generation which is not uniform
