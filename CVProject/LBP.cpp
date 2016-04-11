@@ -72,6 +72,12 @@ void LBP_class::LBP_func(int radius, int numNeighbors, ImageDataSet data) //set 
 				for (int colIDX = 1; colIDX < (trainingSet[j].cols - 1); colIDX++)
 				{
 					cout << "Inside the for loop" << '\n';
+					if (trainingSet[j].type() != CV_32F) {
+						cout << "training set does not have the right type \n";
+						trainingSet[j].convertTo(trainingSet[j], CV_32F);
+
+					}
+					cout << "dimesions of training set = " << trainingSet[j].rows << "x" << trainingSet[j].cols << "\n";
 					float centerPX = trainingSet[j].at<float>(rowIDX, colIDX);
 					cout << "center pixel value is: " << centerPX << '\n';
 					
