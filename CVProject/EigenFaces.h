@@ -18,4 +18,7 @@ public:
 	Mat reconstruct(int numEigenvectors, Mat projection);
 	Mat getDataAsRows(vector<Mat> src);
 	int makePrediction(Mat trainingProjections, Mat testingProjection);
+	void probEigenfaces(vector<Mat> trainingImages, vector<string> labels);
+	void crossValidationProb(ImageDataSet data);
+	string probRecognition(Mat testProjection);
 };
