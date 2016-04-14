@@ -16,6 +16,8 @@
 using namespace cv;
 using namespace std;
 ofstream myfile;
+/* Set the number of codewords*/
+const int numCodewords = 10;
 
 void BOWFaces::BOWcrossValidation(ImageDataSet data) {
 
@@ -57,9 +59,6 @@ void BOWFaces::BOWcrossValidation(ImageDataSet data) {
 		cvtColor(data.QMUL_getSubjectImageByPose(data.QMUL_SubjectIDs[i], "090", "090"), grey, CV_BGR2GRAY);
 		trainingSet.push_back(grey);
 		}*/
-
-		/* Set the number of codewords*/
-		const int numCodewords = 50; // need to check for all 13 different values
 
 		/* Variable definition */
 		Mat codeBook;
@@ -137,19 +136,80 @@ double BOWFaces::BOWTest(const vector<Mat>& imgSet, const Mat &codeBook, const v
 		BOWdescriptorExtractor->compute2(imgSet[ind], keypoints, BOWhistogram);
 		int bestMatch_image = -1;
 		double bestMatch_score = -1;
+		//Mat bowhistrowmatch;
 		//iterate over all image descriptors to find best match
 		for (int i = 0; i < BOWhistrow.size(); i++) {
 			double curScore = chiSquareDist(BOWhistrow[i], BOWhistogram);
 			if (bestMatch_image == -1 || bestMatch_score == -1) {
 				bestMatch_image = i;
 				bestMatch_score = curScore;
+				//bowhistrowmatch = BOWhistrow[i];
 			}
 			else {
 				if (bestMatch_score > curScore){
 					bestMatch_image = i;
 					bestMatch_score = curScore;
+					//bowhistrowmatch = BOWhistrow[i];
 				}
 			}
+			// this code was used for Q13
+			/*if (actual_image.compare(image_result)){
+				matches++;
+				if (matches < 3){
+					Mat testImageHistMatch = Mat::ones(200, 320, CV_8U) * 255;
+					normalize(BOWhistogram, BOWhistogram, 0, testImageHistMatch.rows, CV_MINMAX, CV_32F);
+					testImageHistMatch = Scalar::all(255);
+
+					int binW = cvRound((double)testImageHistMatch.cols / numCodewords);
+	
+					for (int i = 0; i < numCodewords; i++)
+						rectangle(testImageHistMatch, Point(i*binW, testImageHistMatch.rows),
+						Point((i + 1)*binW, testImageHistMatch.rows - cvRound(BOWhistogram.at<float>(i))),
+						Scalar::all(0), -1, 8, 0);
+					imwrite("testImageHistMatch" + to_string(ind) + ".jpg", testImageHistMatch);
+
+					Mat trainingImageHistMatch = Mat::ones(200, 320, CV_8U) * 255;
+					normalize(bowhistrowmatch, bowhistrowmatch, 0, trainingImageHistMatch.rows, CV_MINMAX, CV_32F);
+					trainingImageHistMatch = Scalar::all(255);
+	
+					int binV = cvRound((double)trainingImageHistMatch.cols / numCodewords);
+
+					for (int i = 0; i < numCodewords; i++)
+						rectangle(trainingImageHistMatch, Point(i*binW, trainingImageHistMatch.rows),
+						Point((i + 1)*binV, trainingImageHistMatch.rows - cvRound(bowhistrowmatch.at<float>(i))),
+						Scalar::all(0), -1, 8, 0);
+					imwrite("trainingImageHistMatch" + to_string(ind) + ".jpg", trainingImageHistMatch);
+				}
+			}
+			else{
+				mismatches++;
+				if (mismatches < 3){
+					Mat testImageHistMismatch = Mat::ones(200, 320, CV_8U) * 255;
+					normalize(BOWhistogram, BOWhistogram, 0, testImageHistMismatch.rows, CV_MINMAX, CV_32F);
+					testImageHistMismatch = Scalar::all(255);
+	
+					int binW = cvRound((double)testImageHistMismatch.cols / numCodewords);
+	
+					for (int i = 0; i < numCodewords; i++)
+						rectangle(testImageHistMismatch, Point(i*binW, testImageHistMismatch.rows),
+						Point((i + 1)*binW, testImageHistMismatch.rows - cvRound(BOWhistogram.at<float>(i))),
+						Scalar::all(0), -1, 8, 0);
+					imwrite("testImageHistMismatch" + to_string(ind) + ".jpg", testImageHistMismatch);
+
+					Mat trainingImageHistMismatch = Mat::ones(200, 320, CV_8U) * 255;
+					normalize(bowhistrowmatch, bowhistrowmatch, 0, trainingImageHistMismatch.rows, CV_MINMAX, CV_32F);
+					trainingImageHistMismatch = Scalar::all(255);
+
+					int binV = cvRound((double)trainingImageHistMismatch.cols / numCodewords);
+
+					for (int i = 0; i < numCodewords; i++)
+						rectangle(trainingImageHistMismatch, Point(i*binW, trainingImageHistMismatch.rows),
+						Point((i + 1)*binV, trainingImageHistMismatch.rows - cvRound(bowhistrowmatch.at<float>(i))),
+						Scalar::all(0), -1, 8, 0);
+					imwrite("trainingImageHistMismatch" + to_string(ind) + ".jpg", trainingImageHistMismatch);
+				}
+			}
+		}*/
 		}
 		myfile << ind << ", " << bestMatch_image << "\n";
 		string actual_image = testSetLabels[ind];
