@@ -21,4 +21,5 @@ public:
 	void probEigenfaces(vector<Mat> trainingImages, vector<string> labels);
 	void crossValidationProb(ImageDataSet data);
 	string probRecognition(Mat testProjection);
+	void PoseEstimation(ImageDataSet data);
 };

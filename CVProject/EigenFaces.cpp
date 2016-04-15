@@ -53,7 +53,6 @@ void EigenFaces::Eigenfaces(const vector<Mat> imgSet) {
 		cout << "format is =  \n" << _data.type() << '\n';
 		_data.convertTo(_data, CV_32FC1);
 		printf("Matrix does not have right format\n");
-		cout << "format is = " << _data.type() << '\n';
 	}
 	Mat cov = Mat(height, height, CV_32F);
 	_mean = Mat(1, _data.cols, CV_32F, 0);
@@ -62,11 +61,8 @@ void EigenFaces::Eigenfaces(const vector<Mat> imgSet) {
 	calcCovarMatrix(_data, cov, _mean, CV_COVAR_SCRAMBLED + CV_COVAR_ROWS + CV_COVAR_SCALE, CV_32F);
 
 	bool ret;
-	cout << "I get covariance matrix \n";
 	
 	eigen(cov, _eigenvalues, tempEigen);
-
-	cout << "I get temp eigenvalues \n";
 
 	//minus mean from data for eigenvector calculation purpose
 	Mat temp_data = _data.clone();
@@ -90,17 +86,6 @@ void EigenFaces::Eigenfaces(const vector<Mat> imgSet) {
 		cout << "norm is " << norm(_eigenvectors.row(i)) << "\n";
 	}
 
-	cout << "I get eigenvectors\n";
-	
-	/*
-	_pca = PCA(_data, Mat(), CV_PCA_DATA_AS_ROW);
-	_eigenvectors = _pca.eigenvectors.clone();
-	_mean = _pca.mean;
-	for (int i = 0; i < height; i++) {
-		cout << "norm is " << norm(_eigenvectors.row(i)) << "\n";
-	}*/
-	cout << "Dimensions of eigenvectors "<< _eigenvectors.rows <<"x"<< _eigenvectors.cols << "\n";
-	cout << "Dimensions of mean " << _mean.rows << "x" << _mean.cols << "\n";
 
 	transpose(_eigenvectors, _eigenvectors);
 	
@@ -110,7 +95,7 @@ void EigenFaces::Eigenfaces(const vector<Mat> imgSet) {
 vector<Mat> _meansOfSubjects; //store the mean of each subject
 vector<Mat> _inverseCovarianceOfSubjects; //store the inverse covariance of each subject
 vector<Mat> _covarianceOfSubjects;
-//finds the probabilistic parameters for each subject ie covariance and mean
+//finds the probabilistic parameters for each subject ie covariance and mean and inverts covariance
 void EigenFaces::probEigenfaces(vector<Mat> trainingImages, vector<string> labels){
 
 	//find the Eigenspace of all training images using optimal number of eigenvectors
@@ -133,15 +118,6 @@ void EigenFaces::probEigenfaces(vector<Mat> trainingImages, vector<string> label
 		for (int j = 0; j < labels.size(); j++) {
 			if (labels[j].compare(subjectNames[i]) == 0){
 				//add the projection to the projectionsOfsubjects as a row in a matrix
-				/*
-				double min, max;
-				minMaxLoc(projection.row(j), &min, &max);
-				Mat out = Mat(1, 100, CV_32F);
-				projection.row(j).convertTo(out, 255.0 / (max - min));
-				imshow("proje", out.reshape(0,100));
-				waitKey(0);
-				projectionsOfSubjects[i].push_back(projection); //temporary
-				*/
 				projectionsOfSubjects[i].push_back(projection.row(j)); //temporary
 			}
 		}
@@ -158,11 +134,11 @@ void EigenFaces::probEigenfaces(vector<Mat> trainingImages, vector<string> label
 		//create a 100x100 identity matrix in order to remove non-diagonal entries of the covariance matrix
 		Mat ident = Mat::eye(100, 100, CV_32F);
 		covariance = covariance.mul(ident);
-		double det = determinant(covariance);
-		cout << "cov det is " << det << "\n";
+		//double det = determinant(covariance);
+		//cout << "cov det is " << det << "\n";
 		_covarianceOfSubjects.push_back(covariance);
 		int nonZero = countNonZero(covariance);
-		cout << "non zero is " << nonZero << "\n";
+		//cout << "non zero is " << nonZero << "\n";
 
 		//cout << covariance;
 		//now that all off diagonal entries are removed find the inverse of covariance
@@ -173,8 +149,31 @@ void EigenFaces::probEigenfaces(vector<Mat> trainingImages, vector<string> label
 		_meansOfSubjects.push_back(mean);
 	}
 
-}
+	//scale the diagonal of covaariance by dividing by max in the set
+	double max = DBL_MIN;
+	double min = DBL_MAX;
+	for (int i = 0; i < _covarianceOfSubjects.size(); i++) {
+		double temp_max;
+		double temp_min;
+		minMaxLoc(_covarianceOfSubjects[i], &temp_min, &temp_max);
+		if (temp_max > max) {
+			max = temp_max;
+		}
+		if (temp_min < min) {
+			min = temp_min;
+		}
+	}
+	cout << "max = " << max<< "\n";
+	cout << "min = " << min << "\n";
 
+	for (int i = 0; i < _covarianceOfSubjects.size(); i++) {
+		_covarianceOfSubjects[i] = _covarianceOfSubjects[i] * 100/max;
+	}
+}
+/*
+With a testing projection as input, it uses the inverse covariance, covariance and mean of the 
+training set in order to fit a gaussian to the testing set and calculate the recognition error
+*/
 string EigenFaces::probRecognition(Mat testProjection){
 
 	//iterate through all the the gaussian and get the one with the highest likelihood
@@ -188,23 +187,25 @@ string EigenFaces::probRecognition(Mat testProjection){
 		Mat diff_transpose;
 		transpose(diff, diff_transpose);
 		Mat restOfExponent = -0.5*diff * _inverseCovarianceOfSubjects[i] * diff_transpose;
-		cout << restOfExponent << "\n";
+		//cout << restOfExponent << "\n";
 		//cout << "this should be a 1x1 matrix "<<restOfExponent.rows << "X" << restOfExponent.cols << "\n";
-		double restOfExponentInDouble = restOfExponent.at<double>(0, 0);
-		cout << "determinant is " << det << "\n";
-		cout << "restOfExponentInDouble is" << restOfExponentInDouble << "\n";
+		double restOfExponentInDouble = sum(restOfExponent)[0];
+		//cout << "determinant is " << det << "\n";
+		//cout << "restOfExponentInDouble is" << restOfExponentInDouble << "\n";
 
-		double likelihood = pow(2 * 3.14, -50)*pow(det, -0.5)*pow(2.71, restOfExponentInDouble);
+		double likelihood = pow(det, -0.5)*pow(2.71, restOfExponentInDouble);
 		//cout << "likelihood isssss = "<< restOfExponentInDouble << "\n";
 		if (likelihood > maxLikelihood) {
 			maxLikelihood = likelihood;
 			idOfMaxLikelihood = subjectNames[i];
 		}
 	}
-	cout << "Max likelihood is " << maxLikelihood << "\n";
+	//cout << "Max likelihood is " << maxLikelihood << "\n";
 	return idOfMaxLikelihood;
 }
-
+/*
+Does 7 fold cross validation for the probabilistic part
+*/
 void EigenFaces::crossValidationProb(ImageDataSet data){
 	vector<Mat> trainingSet;
 	vector<Mat> testSet;
@@ -213,15 +214,14 @@ void EigenFaces::crossValidationProb(ImageDataSet data){
 	double recognitionRateTesting = 0;
 	int numCorrectlyPredicted = 0;
 
-	cout << "I am doing prob\n";
 	KFold kfold;
 	vector<vector<Mat>> partitioned = kfold.getPartitionedData(data);
 	vector<vector<string>> labels = kfold.getLabels();
 	int sizeOfTest = partitioned[0].size();
 
 	//get the test set and training set (different each time)
-	for (int kOfTest = 0; kOfTest < 2; kOfTest++){
-		for (int i = 0; i < 2; i++){
+	for (int kOfTest = 0; kOfTest < 7; kOfTest++){
+		for (int i = 0; i < 7; i++){
 			//insert kOfTest partition as test set
 			if (i == kOfTest) {
 				testSet.insert(testSet.end(), partitioned[i].begin(), partitioned[i].end());
@@ -248,10 +248,22 @@ void EigenFaces::crossValidationProb(ImageDataSet data){
 			}
 		}
 
+		trainingSet.clear();
+		testSet.clear();
+		trainingSetLabels.clear();
+		testSetLabels.clear();
+		_meansOfSubjects.clear();
+		_inverseCovarianceOfSubjects.clear();
+		_covarianceOfSubjects.clear();
+
 	}
 	recognitionRateTesting = (double)numCorrectlyPredicted * 100 / (7 * (double)sizeOfTest);
 	cout << "recognition rate is " << recognitionRateTesting << "\n";
 }
+/*
+Takes as input a data set. 
+Does 7 fold cross validation for reconstruction error and recognition rate
+*/
 void EigenFaces::crossValidation(ImageDataSet data) {
 
 
@@ -429,14 +441,15 @@ void EigenFaces::crossValidation(ImageDataSet data) {
 		//display original and reconstructed image
 		//display the reconstruction image
 		// for 1,5 and 100 eigenvectors display 2 images from training and 2 from test
-		if ((numEigenvectors == 1 || numEigenvectors == 3 || numEigenvectors == 100) &&kOfTest ==0){
-			for (int i = 0; i < 3; i++){
+		if ((numEigenvectors == 1 || numEigenvectors == 5 || numEigenvectors == 3000) &&kOfTest ==0){
+			int idx = 7;
+			for (int i = 1; i < 3; i++){
 				double min, max;
 				minMaxLoc(reconstruction, &min, &max);
 				cout << "min for reconstruction is " << min << '\n';
 				cout << "max for reconstruction is" << max << '\n';
 				Mat reconstructionToDisplay;
-				reconstruction.row(i).convertTo(reconstructionToDisplay, CV_8U, 255.0 / (max - min));
+				reconstruction.row(idx).convertTo(reconstructionToDisplay, CV_8U, 255.0 / (max - min));
 				namedWindow("reconstruction training", WINDOW_AUTOSIZE);
 				imshow("reconstruction image", reconstructionToDisplay.reshape(0, 100));
 				waitKey(0);
@@ -447,28 +460,28 @@ void EigenFaces::crossValidation(ImageDataSet data) {
 				cout << "min for _data is " << min << '\n';
 				cout << "max for _data is" << max << '\n';
 				Mat dataToDisplay;
-				_data.row(i).convertTo(dataToDisplay, CV_8U);
+				_data.row(idx).convertTo(dataToDisplay, CV_8U);
 				namedWindow("original training", WINDOW_AUTOSIZE);
 				imshow("data image", dataToDisplay.reshape(0, 100));
 				waitKey(0);
 				destroyAllWindows();
-
-				minMaxLoc(reconstructionTesting.row(i), &min, &max);
+				idx += 10;
+				minMaxLoc(reconstructionTesting.row(idx), &min, &max);
 				cout << "min for reconstruction is " << min << '\n';
 				cout << "max for reconstruction is" << max << '\n';
 				Mat reconstructionToDisplayTesting;
-				reconstructionTesting.row(i).convertTo(reconstructionToDisplayTesting, CV_8U, 255.0 / (max - min));
+				reconstructionTesting.row(idx).convertTo(reconstructionToDisplayTesting, CV_8U, 255.0 / (max - min));
 				namedWindow("reco testing", WINDOW_AUTOSIZE);
 				imshow("reconstruction testig", reconstructionToDisplayTesting.reshape(0, 100));
 				waitKey(0);
 				destroyAllWindows();
 
 				//display the original image
-				minMaxLoc(_testingData.row(i), &min, &max);
+				minMaxLoc(_testingData.row(idx), &min, &max);
 				cout << "min for _data is " << min << '\n';
 				cout << "max for _data is" << max << '\n';
 				Mat dataToDisplayTesting;
-				_testingData.row(i).convertTo(dataToDisplayTesting, CV_8U);
+				_testingData.row(idx).convertTo(dataToDisplayTesting, CV_8U);
 				namedWindow("ori testing", WINDOW_AUTOSIZE);
 				imshow("data testing", dataToDisplayTesting.reshape(0, 100));
 				waitKey(0);
@@ -501,111 +514,73 @@ void EigenFaces::crossValidation(ImageDataSet data) {
 	imshow("mean image", _mean.reshape(0, 100));
 	waitKey(0);
 	
-	//temporary for testing purposes
-    /*
-	for (int i = 0; i < data.QMUL_SubjectIDs.size(); i++) {
-
-		//get only one pose for testing
-		Mat grey = Mat(100, 100, CV_8U);
-		cvtColor(data.QMUL_getSubjectImageByPose(data.QMUL_SubjectIDs[i], "090", "090"), grey, CV_BGR2GRAY);
-		//grey.convertTo(grey, CV_32F, 1/255.0);
-		//cout << grey;
-		trainingSet.push_back(grey);
-	}
-
-
-	//call the function to produce eigenvectors
-	Eigenfaces(trainingSet);
-
-
-	//testing purposes with 50 eigenvectors
-	int numEigenvectors = 31;
-
-	//calculate the projection
-	vector<Mat> projections;
-	for (int i = 0; i < _data.rows; i++){
-		Mat projection = Mat(1, numEigenvectors, CV_32F);
-		projection = project(numEigenvectors, _data.row(i));
-		projections.push_back(projection);
-	}
-	vector<Mat> reconstructions;
-	//get the reconstuction matrix
-	for (int i = 0; i < projections.size(); i++){
-		Mat reconstruction = Mat(1, _data.cols, CV_32F);
-
-		reconstruction = reconstruct(numEigenvectors, projections[i]);
-		reconstructions.push_back(reconstruction);
-	}
-
-	//get the reconstruction error
-	//Mat differenceMatrix = Mat(_data.rows, _data.cols, CV_32F);
-	//absdiff(reconstruction, _data, differenceMatrix);
-	//double reconstructionError = sum(differenceMatrix)[0];
-
-	//cout << "reconstruction error is " << reconstructionError / (31 * 10000) << '\n';
-
-	//get reconstruction for one image at a time
-	for (int i = 0; i < 31; i++){
-		double temp_error = 0;
-		double temp_error2 = 0;
-		Mat error = Mat(1, 10000, CV_32F, 0);
-		error.setTo(0);
-		absdiff(_data.row(i), reconstructions[i], error);
-		temp_error = sum(error)[0];
-		//cout << error.reshape(0, 100).row(0);
-		cout << "reconstruction error is " << temp_error << "\n";
-
-	}
-		
-
-	//display the average image
-	//convert first
-	//find max and min
-	double min, max;
-	minMaxLoc(_mean, &min, &max);
-	cout << "min is " << min << '\n';
-	cout << "max is" << max << '\n';
-	_mean.convertTo(_mean, CV_8U);
-	imshow("mean image", _mean.reshape(0, 100));
-	waitKey(0);
-
-	minMaxLoc(_eigenvectors.col(5), &min, &max);
-	cout << "min is " << min << '\n';
-	cout << "max is" << max << '\n';
-	Mat eigenout = Mat(1, 10000, CV_8U);
-	_eigenvectors.col(5).convertTo(eigenout, CV_8U, 255.0/(max-min));
-	imshow("eigenface", eigenout.reshape(0, 100));
-	waitKey(0);
-
-	//display the reconstruction image
-	for (int i = 0; i < 31; i++){
-		minMaxLoc(reconstructions[i], &min, &max);
-		cout << "min for reconstruction is " << min << '\n';
-		cout << "max for reconstruction is" << max << '\n';
-		reconstructions[i].convertTo(reconstructions[i], CV_8U, 255.0 / (max - min));
-		imshow("reconstruction image", reconstructions[i].reshape(0, 100));
-		waitKey(0);
-
-		//display the original image
-		minMaxLoc(_data.row(i), &min, &max);
-		cout << "min for _data is " << min << '\n';
-		cout << "max for _data is" << max << '\n';
-		_data.convertTo(_data, CV_8U);
-		imshow("data image", _data.row(i).reshape(0, 100));
-		waitKey(0);
-	}
-	//display the projection
-	cout << "projection dimensions = " << projections[1].rows << "x" << projections[1].cols << "\n";
-	minMaxLoc(projections[1], &min, &max);
-	cout << "min for projection is " << min << '\n';
-	cout << "max for projection is" << max << '\n';
-	//projection.convertTo(projection, CV_8U, 255.0/(max-min));
-	//imshow("projection image", projection.row(0).reshape(0, 100));
-	//waitKey(0);
 	
-	*/
 }
+//Attempted to do pose estimation but didnt have time
+void EigenFaces::PoseEstimation(ImageDataSet data){
+	/*
+	vector < vector<double>> confusionMatrix;
+	vector<vector<Mat>> imagesPerClass;
+	vector<Mat> eigenspacePerClass;
+	vector<Mat> projectionPerClass;
+	vector<Mat> meanPerClass;
+	eigenspacePerClass.resize(21);
+	projectionPerClass.resize(21);
+	imagesPerClass.resize(21);
+	//get the classes
+	vector<vector<string>> panClasses;
+	vector<vector<string >> tiltClasses;
+	panClasses.resize(3);
+	panClasses[0] = { "-30", "-15" };
+	panClasses[1] = { "+0" };
+	panClasses[2] = { "+15", "+30" };
+	tiltClasses.resize(7);
+	tiltClasses[0] = { "-90", "-75" };
+	tiltClasses[1] = { "-60", "-45" };
+	tiltClasses[2] = { "-30", "-15" };
+	tiltClasses[3] = { "+0" };
+	tiltClasses[4] = { "+15", "+30" };
+	tiltClasses[5] = { "+45", "+60" };
+	tiltClasses[6] = { "+75", "+90" };
+	//initialize confusion matrix
+	confusionMatrix.resize(21);
+	for (int i = 0; i < 21; i++){
+		confusionMatrix[i].resize(21);
+	}
 
+	//go through all pose classes and get the images
+	int classIdx = 0;
+	for (int i = 0; i < panClasses.size(); i++){
+		for (int j = 0; j < tiltClasses.size(); j++){
+			//get all the real angles for each class and add them to the imageset for that angle
+			for (int k = 0; k < panClasses[i].size(); k++) {
+				for (int l = 0; l < tiltClasses[j].size(); j++){
+					imagesPerClass[classIdx] = data.QMUL_getImagesByPose(tiltClasses[j][l], panClasses[i][k]);
+				}
+			}
+			classIdx++;
+		}
+	}
+
+	//now that we have all images train on them
+	for (int i = 0; i < 21; i++){
+		//create ith eigenspace
+		Eigenfaces(imagesPerClass[i]);
+		eigenspacePerClass[i].push_back(_eigenvectors);
+		Mat projection = project(100, _data);
+		projectionPerClass[i].push_back(projection);
+		//clear
+		_data.deallocate;
+		_eigenvectors.deallocate;
+		_mean.deallocate;
+	}
+	*/
+	//now get testing images and project each one
+}
+/*
+Projects the input to the eigenspace
+Projection = [Image-Mean] * eigenvectors(subset)
+*/
 Mat EigenFaces::project(int numEigenvectors, Mat input){
 	Mat subsetOfEigenvectors = Mat(_eigenvectors.rows, numEigenvectors, CV_32F);
 	//get current subset of eigenvectors 
@@ -640,7 +615,7 @@ Mat EigenFaces::project(int numEigenvectors, Mat input){
 
 	return projection;
 }
-
+//simply makes a prediction based on minimum eukleidian distance of test set projection vs all training projections to eigenspace
 int EigenFaces::makePrediction(Mat trainingProjections, Mat testingProjection){
 
 	double minimumDistance = DBL_MAX;
@@ -655,6 +630,8 @@ int EigenFaces::makePrediction(Mat trainingProjections, Mat testingProjection){
 	}
 	return predictedRow;
 }
+//Performs reconstruction as Reconstruction = Projection * eigenvectors_transposed
+//
 Mat EigenFaces::reconstruct(int numEigenvectors, Mat projection){
 	Mat subsetOfEigenvectors = Mat(_eigenvectors.rows, numEigenvectors, CV_32F);
 	//now eigenvectors stored by column so get numEienvectors columns TODO: CHECK VALIDITY 
@@ -699,13 +676,7 @@ Mat EigenFaces::getDataAsRows(vector<Mat> src){
 	printf("heigth and width are %d, %d \n", height, width);
 	Mat ret = Mat(height, width, CV_32F);
 	for (int i = 0; i < height; i++) {
-		/*
-		if (src[i].isContinuous()){
-			src[i].reshape(0, 1).convertTo(ret.row(i), ret.type());
-		}
-		else {
-			src[i].clone().reshape(0, 1).copyTo(ret.row(i));
-		}*/
+
 		src[i].reshape(0, 1).copyTo(ret.row(i));
 	}
 
