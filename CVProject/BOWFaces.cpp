@@ -15,9 +15,19 @@
 
 using namespace cv;
 using namespace std;
-ofstream myfile;
+//ofstream myfile; // this var was used for testing and storing output
 /* Set the number of codewords*/
 const int numCodewords = 10;
+
+const vector<string> subjectNames = vector<string>
+({
+	"AdamB", "AndreeaV", "CarlaB", "ColinP", "DanJ",
+	"DennisP", "DennisPNoGlasses", "DerekC", "GrahamW", "HeatherL",
+	"Jack", "JamieS", "JeffNG", "John", "OngEJ",
+	"KateS", "KatherineW", "KeithC", "KrystynaN", "PaulV",
+	"RichardB", "RichardH", "SarahL", "SeanG", "SeanGNoGlasses"
+	, "SimonB", "SueW", "TasosH", "TomK", "YogeshR", "YongminY"
+});
 
 void BOWFaces::BOWcrossValidation(ImageDataSet data) {
 
@@ -28,7 +38,7 @@ void BOWFaces::BOWcrossValidation(ImageDataSet data) {
 	double recogRates[7];
 	double avgRecogRate;
 
-	myfile.open("BOWFacesOut.txt", fstream::app);
+	//myfile.open("BOWFacesOut.txt", fstream::app);
 
 	KFold kfold;
 	vector<vector<Mat>> partitioned = kfold.getPartitionedData(data);
@@ -48,16 +58,16 @@ void BOWFaces::BOWcrossValidation(ImageDataSet data) {
 				trainingSetLabels.insert(trainingSetLabels.end(), labels[i].begin(), labels[i].end());
 			}
 		}
-		//now we have training and test set. Call EigenFaces on training set in order to produce eigenvectors and eigenvalues
-		cout << "size of training set =" << trainingSet.size() << '\n';
-		cout << "size of test set =" << testSet.size() << '\n';
+
+		//cout << "size of training set =" << trainingSet.size() << '\n';
+		//cout << "size of test set =" << testSet.size() << '\n';
 
 		/*// test with single pose
 		for (int i = 0; i < data.QMUL_SubjectIDs.size(); i++) {
-		//get only one pose for testing
-		Mat grey = Mat(100, 100, CV_32FC1);
-		cvtColor(data.QMUL_getSubjectImageByPose(data.QMUL_SubjectIDs[i], "090", "090"), grey, CV_BGR2GRAY);
-		trainingSet.push_back(grey);
+			//get only one pose for testing
+			Mat grey = Mat(100, 100, CV_32FC1);
+			cvtColor(data.QMUL_getSubjectImageByPose(data.QMUL_SubjectIDs[i], "090", "090"), grey, CV_BGR2GRAY);
+			trainingSet.push_back(grey);
 		}*/
 
 		/* Variable definition */
@@ -65,7 +75,7 @@ void BOWFaces::BOWcrossValidation(ImageDataSet data) {
 		vector<Mat> BOWhistrow;
 
 		/* Training */
-		BOWTrain(trainingSet, codeBook, BOWhistrow , numCodewords);
+		BOWTrain(trainingSet, codeBook, BOWhistrow);
 
 		/* Testing */
 		recogRates[kOfTest] = BOWTest(testSet, codeBook, BOWhistrow, trainingSetLabels, testSetLabels);
@@ -79,12 +89,12 @@ void BOWFaces::BOWcrossValidation(ImageDataSet data) {
 	}
 	avgRecogRate = ((double)sum) / 7.0;
 	cout << "Average Recognition rate: " << avgRecogRate << endl;
-	myfile << "Average Recognition rate: " << avgRecogRate << "\n";
+	//myfile << "Average Recognition rate: " << avgRecogRate << "\n";
 	system("pause");
-	myfile.close();
+	//myfile.close();
 }
 
-void BOWFaces::BOWTrain(const vector<Mat>& imgSet, Mat &codeBook, vector<Mat> &BOWhistrow, const int numCodewords)
+void BOWFaces::BOWTrain(const vector<Mat>& imgSet, Mat &codeBook, vector<Mat> &BOWhistrow)
 {
 	Ptr<FeatureDetector> featureDetector = FeatureDetector::create("SIFT");
 	Ptr<DescriptorExtractor> featureExtractor = DescriptorExtractor::create("SIFT");
@@ -136,7 +146,7 @@ double BOWFaces::BOWTest(const vector<Mat>& imgSet, const Mat &codeBook, const v
 		BOWdescriptorExtractor->compute2(imgSet[ind], keypoints, BOWhistogram);
 		int bestMatch_image = -1;
 		double bestMatch_score = -1;
-		//Mat bowhistrowmatch;
+		//Mat bowhistrowmatch; // this variable was used in Q13
 		//iterate over all image descriptors to find best match
 		for (int i = 0; i < BOWhistrow.size(); i++) {
 			double curScore = chiSquareDist(BOWhistrow[i], BOWhistogram);
@@ -159,19 +169,17 @@ double BOWFaces::BOWTest(const vector<Mat>& imgSet, const Mat &codeBook, const v
 					Mat testImageHistMatch = Mat::ones(200, 320, CV_8U) * 255;
 					normalize(BOWhistogram, BOWhistogram, 0, testImageHistMatch.rows, CV_MINMAX, CV_32F);
 					testImageHistMatch = Scalar::all(255);
-
 					int binW = cvRound((double)testImageHistMatch.cols / numCodewords);
-	
+
 					for (int i = 0; i < numCodewords; i++)
-						rectangle(testImageHistMatch, Point(i*binW, testImageHistMatch.rows),
+						rectangle(	testImageHistMatch, Point(i*binW, testImageHistMatch.rows),
 						Point((i + 1)*binW, testImageHistMatch.rows - cvRound(BOWhistogram.at<float>(i))),
 						Scalar::all(0), -1, 8, 0);
 					imwrite("testImageHistMatch" + to_string(ind) + ".jpg", testImageHistMatch);
-
 					Mat trainingImageHistMatch = Mat::ones(200, 320, CV_8U) * 255;
 					normalize(bowhistrowmatch, bowhistrowmatch, 0, trainingImageHistMatch.rows, CV_MINMAX, CV_32F);
 					trainingImageHistMatch = Scalar::all(255);
-	
+
 					int binV = cvRound((double)trainingImageHistMatch.cols / numCodewords);
 
 					for (int i = 0; i < numCodewords; i++)
@@ -184,34 +192,30 @@ double BOWFaces::BOWTest(const vector<Mat>& imgSet, const Mat &codeBook, const v
 			else{
 				mismatches++;
 				if (mismatches < 3){
-					Mat testImageHistMismatch = Mat::ones(200, 320, CV_8U) * 255;
-					normalize(BOWhistogram, BOWhistogram, 0, testImageHistMismatch.rows, CV_MINMAX, CV_32F);
-					testImageHistMismatch = Scalar::all(255);
-	
-					int binW = cvRound((double)testImageHistMismatch.cols / numCodewords);
-	
-					for (int i = 0; i < numCodewords; i++)
-						rectangle(testImageHistMismatch, Point(i*binW, testImageHistMismatch.rows),
-						Point((i + 1)*binW, testImageHistMismatch.rows - cvRound(BOWhistogram.at<float>(i))),
-						Scalar::all(0), -1, 8, 0);
-					imwrite("testImageHistMismatch" + to_string(ind) + ".jpg", testImageHistMismatch);
+				Mat testImageHistMismatch = Mat::ones(200, 320, CV_8U) * 255;
+				normalize(BOWhistogram, BOWhistogram, 0, testImageHistMismatch.rows, CV_MINMAX, CV_32F);
+				testImageHistMismatch = Scalar::all(255);
 
-					Mat trainingImageHistMismatch = Mat::ones(200, 320, CV_8U) * 255;
-					normalize(bowhistrowmatch, bowhistrowmatch, 0, trainingImageHistMismatch.rows, CV_MINMAX, CV_32F);
-					trainingImageHistMismatch = Scalar::all(255);
+				int binW = cvRound((double)testImageHistMismatch.cols / numCodewords);
 
-					int binV = cvRound((double)trainingImageHistMismatch.cols / numCodewords);
-
-					for (int i = 0; i < numCodewords; i++)
-						rectangle(trainingImageHistMismatch, Point(i*binW, trainingImageHistMismatch.rows),
-						Point((i + 1)*binV, trainingImageHistMismatch.rows - cvRound(bowhistrowmatch.at<float>(i))),
-						Scalar::all(0), -1, 8, 0);
-					imwrite("trainingImageHistMismatch" + to_string(ind) + ".jpg", trainingImageHistMismatch);
+				for (int i = 0; i < numCodewords; i++)
+					rectangle(testImageHistMismatch, Point(i*binW, testImageHistMismatch.rows),
+					Point((i + 1)*binW, testImageHistMismatch.rows - cvRound(BOWhistogram.at<float>(i))),
+					Scalar::all(0), -1, 8, 0);
+				imwrite("testImageHistMismatch" + to_string(ind) + ".jpg", testImageHistMismatch);
+				Mat trainingImageHistMismatch = Mat::ones(200, 320, CV_8U) * 255;
+				normalize(bowhistrowmatch, bowhistrowmatch, 0, trainingImageHistMismatch.rows, CV_MINMAX, CV_32F);
+				trainingImageHistMismatch = Scalar::all(255);
+				int binV = cvRound((double)trainingImageHistMismatch.cols / numCodewords);
+				for (int i = 0; i < numCodewords; i++)
+					rectangle(trainingImageHistMismatch, Point(i*binW, trainingImageHistMismatch.rows),
+					Point((i + 1)*binV, trainingImageHistMismatch.rows - cvRound(bowhistrowmatch.at<float>(i))),
+					Scalar::all(0), -1, 8, 0);
+				imwrite("trainingImageHistMismatch" + to_string(ind) + ".jpg", trainingImageHistMismatch);
 				}
-			}
-		}*/
+			}*/
 		}
-		myfile << ind << ", " << bestMatch_image << "\n";
+		//myfile << ind << ", " << bestMatch_image << "\n";
 		string actual_image = testSetLabels[ind];
 		string image_result = trainingSetLabels[bestMatch_image];
 		if (actual_image.compare(image_result)){
@@ -226,7 +230,180 @@ double BOWFaces::BOWTest(const vector<Mat>& imgSet, const Mat &codeBook, const v
 	cout << "Actual score: " << matches << endl;
 	cout << "Max score: " << max_score << endl;
 	cout << "Recognition rate: " << recognition_rate << endl;
-	myfile << "Recognition rate: " << recognition_rate << "\n";
+	//myfile << "Recognition rate: " << recognition_rate << "\n";
+	return recognition_rate;
+}
+
+void BOWFaces::BOWcrossValidationProb(ImageDataSet data) {
+
+	vector<Mat> trainingSet;
+	vector<Mat> testSet;
+	vector<string> trainingSetLabels;
+	vector<string> testSetLabels;
+	double recogRates[7];
+	double avgRecogRate;
+
+	//myfile.open("BOWFacesOut.txt", fstream::app);
+
+	KFold kfold;
+	vector<vector<Mat>> partitioned = kfold.getPartitionedData(data);
+	vector<vector<string>> labels = kfold.getLabels();
+
+	//get the test set and training set (different each time)
+	for (int kOfTest = 0; kOfTest < 7; kOfTest++){
+		for (int i = 0; i < 7; i++){
+			//insert kOfTest partition as test set
+			if (i == kOfTest) {
+				testSet.insert(testSet.end(), partitioned[i].begin(), partitioned[i].end());
+				testSetLabels.insert(testSetLabels.end(), labels[i].begin(), labels[i].end());
+			}
+			//else its part of the training set
+			else {
+				trainingSet.insert(trainingSet.end(), partitioned[i].begin(), partitioned[i].end());
+				trainingSetLabels.insert(trainingSetLabels.end(), labels[i].begin(), labels[i].end());
+			}
+		}
+
+		//cout << "size of training set =" << trainingSet.size() << '\n';
+		//cout << "size of test set =" << testSet.size() << '\n';
+
+		/* Variable definition */
+		Mat codeBook;
+		vector<Mat> BOWhistrow;
+		BOWhistrow.resize(subjectNames.size());
+
+		/* Training */
+		BOWTrainProb(trainingSet, codeBook, BOWhistrow, trainingSetLabels);
+
+		/* Testing */
+		recogRates[kOfTest] = BOWTestProb(testSet, codeBook, BOWhistrow, trainingSetLabels, testSetLabels);
+		testSet.clear();
+		trainingSet.clear();
+	}
+
+	double sum = 0;
+	for (int i = 0; i < 7; i++){
+		sum += recogRates[i];
+	}
+	avgRecogRate = ((double)sum) / 7.0;
+	cout << "Average Recognition rate: " << avgRecogRate << endl;
+	//myfile << "Average Recognition rate: " << avgRecogRate << "\n";
+	system("pause");
+	//myfile.close();
+}
+
+vector<Mat> _meansOfSubjects; //store the mean of each subject
+vector<Mat> _inverseCovarianceOfSubjects; //store the inverse covariance of each subject
+vector<Mat> _covarianceOfSubjects;
+
+void BOWFaces::BOWTrainProb(const vector<Mat>& imgSet, Mat &codeBook, vector<Mat> &BOWhistrow, const vector<string> &trainingSetLabels)
+{
+	Ptr<FeatureDetector> featureDetector = FeatureDetector::create("SIFT");
+	Ptr<DescriptorExtractor> featureExtractor = DescriptorExtractor::create("SIFT");
+	Mat allDescriptors;
+	Ptr<DescriptorMatcher> descriptorMatcher = DescriptorMatcher::create("BruteForce");
+	Ptr<BOWImgDescriptorExtractor> BOWdescriptorExtractor = new BOWImgDescriptorExtractor(featureExtractor, descriptorMatcher);
+	//iterate over all training images
+	for (int i = 0; i < imgSet.size(); i++) {
+		vector<KeyPoint> keypoints;
+		featureDetector->detect(imgSet[i], keypoints);
+
+		Mat descriptors;
+		featureExtractor->compute(imgSet[i], keypoints, descriptors);
+		allDescriptors.push_back(descriptors);
+	}
+	BOWKMeansTrainer bowTrainer(numCodewords);
+	bowTrainer.add(allDescriptors);
+	codeBook = bowTrainer.cluster();
+
+	BOWdescriptorExtractor->setVocabulary(codeBook);
+	//iterate over all training images
+
+	for (int i = 0; i < imgSet.size(); i++) {
+		vector<KeyPoint> keypoints;
+		featureDetector->detect(imgSet[i], keypoints);
+
+		Mat BOWhistogram;
+		BOWdescriptorExtractor->compute2(imgSet[i], keypoints, BOWhistogram);
+		for (int k = 0; k < subjectNames.size(); k++){
+			for (int j = 0; j < trainingSetLabels.size(); j++) {
+				if (trainingSetLabels[j].compare(subjectNames[k]) == 0){
+					BOWhistrow[k].push_back(BOWhistogram);
+					break;
+				}
+			}
+		}
+	}
+	for (int i = 0; i < subjectNames.size(); i++){
+
+		Mat covariance = Mat(10, 10, CV_32F);
+		Mat mean = Mat(1, 10, CV_32F, 0);
+		calcCovarMatrix(BOWhistrow[i], covariance, mean, CV_COVAR_ROWS + CV_COVAR_NORMAL + CV_COVAR_SCALE, CV_32F);
+
+		Mat ident = Mat::eye(10, 10, CV_32F);
+		covariance = covariance.mul(ident);
+		double det = determinant(covariance);
+		_covarianceOfSubjects.push_back(covariance);
+		int nonZero = countNonZero(covariance);
+
+		Mat inverseCov = covariance.inv();
+		_inverseCovarianceOfSubjects.push_back(inverseCov);
+		_meansOfSubjects.push_back(mean);
+	}
+}
+
+/* Test BoW Prob*/
+double BOWFaces::BOWTestProb(const vector<Mat>& imgSet, const Mat &codeBook, const vector<Mat> &BOWhistrow, const vector<string> &trainingSetLabels, const vector<string> &testSetLabels)
+{
+	Ptr<FeatureDetector> featureDetector = FeatureDetector::create("SIFT");
+	Ptr<DescriptorExtractor> featureExtractor = DescriptorExtractor::create("SIFT");
+	Ptr<DescriptorMatcher> descriptorMatcher = DescriptorMatcher::create("BruteForce");
+	Ptr<BOWImgDescriptorExtractor> BOWdescriptorExtractor = new BOWImgDescriptorExtractor(featureExtractor, descriptorMatcher);
+	BOWdescriptorExtractor->setVocabulary(codeBook);
+	int matches = 0;
+
+	//iterate over all test images
+	for (int ind = 0; ind < imgSet.size(); ind++) {
+		vector<KeyPoint> keypoints;
+		featureDetector->detect(imgSet[ind], keypoints);
+
+		Mat BOWhistogram;
+		BOWdescriptorExtractor->compute2(imgSet[ind], keypoints, BOWhistogram);
+		int bestMatch_image = -1;
+		double bestMatch_score = -1;
+		//iterate over all image descriptors to find best match
+		for (int i = 0; i < BOWhistrow.size(); i++) {
+
+			double det = determinant(_covarianceOfSubjects[i]);
+			Mat diff;
+			subtract(BOWhistogram, _meansOfSubjects[i], diff);
+			Mat diff_transpose;
+			transpose(diff, diff_transpose);
+			Mat restOfExponent = -0.5*diff * _inverseCovarianceOfSubjects[i] * diff_transpose;
+			double restOfExponentInDouble = restOfExponent.at<double>(0, 0);
+
+			double score = pow(2 * 3.14, -50)*pow(det, -0.5)*pow(2.71, restOfExponentInDouble);
+			if (score > bestMatch_score) {
+				bestMatch_score = score;
+				bestMatch_image = i;
+			}
+		}
+		//myfile << ind << ", " << bestMatch_image << "\n";
+		string actual_image = testSetLabels[ind];
+		string image_result = trainingSetLabels[bestMatch_image];
+		if (actual_image.compare(image_result)){
+			matches++;
+		}
+	}
+
+	//compute recognition rate from gathered results
+	size_t max_score = imgSet.size();
+
+	double recognition_rate = ((double)matches) / (double)max_score;
+	cout << "Actual score: " << matches << endl;
+	cout << "Max score: " << max_score << endl;
+	cout << "Recognition rate: " << recognition_rate << endl;
+	//myfile << "Recognition rate: " << recognition_rate << "\n";
 	return recognition_rate;
 }
 
@@ -237,12 +414,11 @@ double BOWFaces::chiSquareDist(InputArray _H1, InputArray _H2)
 	Mat H1 = _H1.getMat();
 	Mat	H2 = _H2.getMat();
 	/*float chiSquareDistance = 0;
-
 	for (int i = 0; i < H1.cols; i++) {
-		float diff = (H1.at<float>(0, i)) - (H2.at<float>(0, i));
-		float sum = (H1.at<float>(0, i)) + (H2.at<float>(0, i));
-		if (fabs(sum) > DBL_EPSILON)
-			chiSquareDistance += (float)(pow(diff, 2) / sum);
+	float diff = (H1.at<float>(0, i)) - (H2.at<float>(0, i));
+	float sum = (H1.at<float>(0, i)) + (H2.at<float>(0, i));
+	if (fabs(sum) > DBL_EPSILON)
+	chiSquareDistance += (float)(pow(diff, 2) / sum);
 	}
 	return chiSquareDistance;*/
 	const Mat* arrays[] = { &H1, &H2, 0 };
